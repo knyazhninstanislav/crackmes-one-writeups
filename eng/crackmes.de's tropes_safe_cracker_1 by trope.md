@@ -3,6 +3,7 @@
 **Crackme:** `tropes_safe_cracker_1`
 **Author:** trope (crackmes.de, mirrored on crackmes.one)
 **Link:** <https://crackmes.one/crackme/5ab77f6533c5d40ad448cb87>
+**Key:** `4 3 5 5 1 3` (buttons: 4, 3, 5, 5, 1, 3)
 
 ---
 
@@ -148,8 +149,44 @@ Set a breakpoint on `safe.4010D3` and continue execution.
 
 On mismatch `sub_401185` is called, which writes `1` to `[0x403109]` — the "validation failed" flag. At the end `cmp byte [0x403109], 1; je 0x401176` — if the flag is set, we **skip the congratulation**.
 
----
+## 5. The recovered key
 
-## Impression
+Using the comparison map with the ASCII codes of the reference string `"1234567890"` (`[edi+0]='1'=0x31`, `[edi+2]='3'=0x33`, `[edi+4]='5'=0x35`):
 
-As an absolute beginner in reversing, this one seemed very well-crafted to me — clean, easy-to-read code and a non-trivial input scheme (buttons instead of plain console input).
+| # | Check | Calculation | Char |
+|---|---|---|---|
+| 1 | `input[0] == [edi+4]-1` | `0x35 - 1 = 0x34` | `'4'` |
+| 2 | `input[2] == [edi+4]` | `0x35` | `'5'` |
+| 3 | `input[1] == [edi+2]` | `0x33` | `'3'` |
+| 4 | `input[4] == [edi+0]` | `0x31` | `'1'` |
+| 5 | `input[5] == [edi+2]` | `0x33` | `'3'` |
+| 6 | `input[3] == [edi+4]` | `0x35` | `'5'` |
+
+Assembling by input index `[0..5]`:
+
+```
+input[0] = '4'
+input[1] = '3'
+input[2] = '5'
+input[3] = '5'
+input[4] = '1'
+input[5] = '3'
+```
+
+> **Key: `4 3 5 5 1 3`** — press the digit buttons in that order, then **Open**.
+
+Sanity check: `lstrlenA` returns `6` — first check passes; all six `cmp`s match — flag `[0x403109]` stays `0`; `je 0x401176` is not taken — we hit `MessageBoxA` with `"Good Job."` / `"Yup"`.
+
+## 6. Patch (optional)
+
+If the goal is not to recover the key but to make the program praise any input:
+
+- **Option A:** in `safe.401185`, replace the store of `1` into `[0x403109]` with `nop`s (or a store of `0`) — the flag never gets set.
+- **Option B:** at `0x40115C`, replace `je 0x401176` with `jmp 0x401176` — then the congratulation never shows (opposite effect, for testing).
+- **Option C:** at `0x40115C`, replace `je` with `jne` — the congratulation shows on **failure**, useful for debugging the MessageBox branch.
+
+## 7. Conclusion
+
+A great crackme for a beginner: a clean dialog procedure, straightforward branching on `wParam`, a tidy validation routine with a transparent comparison map, and a clear result flag. The twist is that input is via buttons (buffer `0x403000` is filled through `safe.4010B1`), not via `GetDlgItemText`/console — which forces you to read the handler logic instead of hunting for an input field.
+
+**Result:** key `4 3 5 5 1 3`, button **Open**, message `"Good Job." / "Yup"`. Task solved, write-up complete.
